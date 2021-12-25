@@ -67,6 +67,11 @@ class Buffer {
         return result;
     }
 
+    void insert(char c, int x, int y) {
+        string s = [c];
+        lines[y] = lines[y][0 .. x] ~ s ~ lines[y][x .. $];
+    }
+
     int num_lines() {
         return cast(int) lines.length;
     }
@@ -112,6 +117,10 @@ class Font {
         return texture;
     }
 }
+
+struct Pos {
+    int x, y;
+};
 
 class BufferView {
     Buffer buffer;
@@ -190,6 +199,11 @@ class BufferView {
         scroll();
     }
 
+    void insert(char c) {
+        buffer.insert(c, cursor_column, cursor_line);
+        movex(1);
+    }
+
     void movehalfpage(int dir) {
         int amount = dir * rows / 2;
         scroll_line += amount;
@@ -197,7 +211,6 @@ class BufferView {
     }
 
     const int scrolloff = 2;
-
     void scroll() {
         if (cursor_line - scroll_line < scrolloff) {
             scroll_line = cursor_line - scrolloff;
@@ -231,7 +244,6 @@ void main() {
     Font font = new Font(window.renderer, "fonts/PragmataPro Mono Regular.ttf", 16);
     BufferView buffer_view = new BufferView(buffer, font);
     window.clear(grey);
-
     bool running = true;
     while (running) {
         SDL_Event event;
@@ -269,6 +281,8 @@ void main() {
                 case SDLK_f:
                     if (event.key.keysym.mod & KMOD_CTRL) {
                         buffer_view.movehalfpage(2);
+                    } else {
+                        buffer_view.insert('f');
                     }
                     break;
                 case SDLK_b:
