@@ -190,19 +190,26 @@ class BufferView {
         scroll();
     }
 
+    void movehalfpage(int dir) {
+        int amount = dir * rows / 2;
+        scroll_line += amount;
+        movey(amount);
+    }
+
     const int scrolloff = 2;
 
     void scroll() {
         if (cursor_line - scroll_line < scrolloff) {
             scroll_line = cursor_line - scrolloff;
-            if (scroll_line < 0) {
-                scroll_line = 0;
-            }
-        } else if (cursor_line - scroll_line > rows - scrolloff) {
+        }
+        if (cursor_line - scroll_line > rows - scrolloff) {
             scroll_line = cursor_line - rows + scrolloff;
-            if (scroll_line + rows > buffer.num_lines()) {
-                scroll_line = buffer.num_lines() - rows;
-            }
+        }
+        if (scroll_line < 0) {
+            scroll_line = 0;
+        }
+        if (scroll_line + rows > buffer.num_lines()) {
+            scroll_line = buffer.num_lines() - rows;
         }
     }
 
@@ -258,6 +265,26 @@ void main() {
                     break;
                 case SDLK_l:
                     buffer_view.movex(1);
+                    break;
+                case SDLK_f:
+                    if (event.key.keysym.mod & KMOD_CTRL) {
+                        buffer_view.movehalfpage(2);
+                    }
+                    break;
+                case SDLK_b:
+                    if (event.key.keysym.mod & KMOD_CTRL) {
+                        buffer_view.movehalfpage(-2);
+                    }
+                    break;
+                case SDLK_d:
+                    if (event.key.keysym.mod & KMOD_CTRL) {
+                        buffer_view.movehalfpage(1);
+                    }
+                    break;
+                case SDLK_u:
+                    if (event.key.keysym.mod & KMOD_CTRL) {
+                        buffer_view.movehalfpage(-1);
+                    }
                     break;
                 default:
                     break;
