@@ -66,6 +66,10 @@ class Buffer {
         result = line[x];
         return result;
     }
+
+    int num_lines() {
+        return cast(int) lines.length;
+    }
 }
 
 SDL_Color grey = {38, 50, 56};
@@ -111,31 +115,41 @@ class Font {
 
 class BufferView {
     Buffer buffer;
+    Font font;
     int scroll_line;
 
     int cursor_line;
     int cursor_column;
 
-    this(Buffer buffer) {
+    int rows;
+    int columns;
+
+    this(Buffer buffer, Font font) {
         this.buffer = buffer;
+        this.font = font;
         scroll_line = 0;
         cursor_line = 0;
         cursor_column = 0;
     }
 
-    void render(Window window, Font font) {
-        int display_rows = window.height / font.height + 1;
-        int display_columns = window.width / font.width + 1;
+    void resize(int width, int height) {
+        rows = height / font.height;
+        columns = width / font.width;
+        scroll();
+    }
 
-        foreach (y; 0 .. display_rows) {
-            foreach (x; 0 .. display_columns) {
-                Nullable!char c = buffer.get(x, y);
+    void render(Window window) {
+        foreach (screen_y; 0 .. rows) {
+            foreach (screen_x; 0 .. columns) {
+                int buffer_x = screen_x;
+                int buffer_y = scroll_line + screen_y;
+                Nullable!char c = buffer.get(buffer_x, buffer_y);
 
-                bool is_cursor = x == cursor_column && y == cursor_line;
+                bool is_cursor = buffer_x == cursor_column && buffer_y == cursor_line;
 
                 if (c.isNull && is_cursor) {
                     auto text = font.render(' ', grey, white);
-                    window.blit(text, x * font.width, y * font.height);
+                    window.blit(text, screen_x * font.width, screen_y * font.height);
                 } else if (!c.isNull) {
                     SDL_Color fg, bg;
                     if (is_cursor) {
@@ -146,15 +160,50 @@ class BufferView {
                         bg = grey;
                     }
                     auto text = font.render(c.get, fg, bg);
-                    window.blit(text, x * font.width, y * font.height);
+                    window.blit(text, screen_x * font.width, screen_y * font.height);
                 }
             }
         }
     }
 
-    void move(int dx, int dy) {
-        cursor_line += dy;
+    void movex(int dx) {
         cursor_column += dx;
+        if (cursor_column > columns) {
+            cursor_column = columns;
+        }
+        if (cursor_column < 0) {
+            cursor_column = 0;
+        }
+
+        scroll();
+    }
+
+    void movey(int dy) {
+        cursor_line += dy;
+        if (cursor_line < 0) {
+            cursor_line = 0;
+        }
+
+        if (cursor_line > buffer.num_lines() - 1) {
+            cursor_line = buffer.num_lines() - 1;
+        }
+        scroll();
+    }
+
+    const int scrolloff = 2;
+
+    void scroll() {
+        if (cursor_line - scroll_line < scrolloff) {
+            scroll_line = cursor_line - scrolloff;
+            if (scroll_line < 0) {
+                scroll_line = 0;
+            }
+        } else if (cursor_line - scroll_line > rows - scrolloff) {
+            scroll_line = cursor_line - rows + scrolloff;
+            if (scroll_line + rows > buffer.num_lines()) {
+                scroll_line = buffer.num_lines() - rows;
+            }
+        }
     }
 
 }
@@ -170,17 +219,15 @@ void init_sdl() {
 
 void main() {
     init_sdl();
-
     Window window = new Window();
     Buffer buffer = new Buffer("source/app.d");
-    BufferView buffer_view = new BufferView(buffer);
-    Font font = new Font(window.renderer, "fonts/PragmataPro Mono Regular.ttf", 24);
+    Font font = new Font(window.renderer, "fonts/PragmataPro Mono Regular.ttf", 16);
+    BufferView buffer_view = new BufferView(buffer, font);
     window.clear(grey);
 
     bool running = true;
     while (running) {
         SDL_Event event;
-
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
             case SDL_QUIT:
@@ -189,41 +236,40 @@ void main() {
             case SDL_WINDOWEVENT:
                 switch (event.window.event) {
                 case SDL_WINDOWEVENT_RESIZED:
-                    window.resize(event.window.data1, event.window.data2);
+                    int w = event.window.data1;
+                    int h = event.window.data2;
+                    window.resize(w, h);
+                    buffer_view.resize(w, h);
                     break;
-
                 default:
                     break;
                 }
                 break;
-
             case SDL_KEYDOWN:
                 switch (event.key.keysym.sym) {
                 case SDLK_h:
-                    buffer_view.move(-1, 0);
+                    buffer_view.movex(-1);
                     break;
                 case SDLK_j:
-                    buffer_view.move(0, 1);
+                    buffer_view.movey(1);
                     break;
                 case SDLK_k:
-                    buffer_view.move(0, -1);
+                    buffer_view.movey(-1);
                     break;
                 case SDLK_l:
-                    buffer_view.move(1, 0);
+                    buffer_view.movex(1);
                     break;
                 default:
                     break;
                 }
                 break;
-
             default:
                 break;
             }
 
         }
         window.clear(grey);
-
-        buffer_view.render(window, font);
+        buffer_view.render(window);
 
         window.redraw();
     }
