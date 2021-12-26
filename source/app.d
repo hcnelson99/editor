@@ -4,6 +4,7 @@ import std.algorithm;
 import std.exception : enforce;
 import std.typecons : Nullable, nullable;
 import std.string;
+import core.time;
 import bindbc.sdl;
 import bindbc.sdl.ttf;
 
@@ -122,23 +123,31 @@ struct Pos {
     int x, y;
 };
 
+enum EditMode {
+    Insert,
+    Normal
+};
+
 class BufferView {
     Buffer buffer;
     Font font;
-    int scroll_line;
-
-    int cursor_line;
-    int cursor_column;
 
     int rows;
     int columns;
 
-    this(Buffer buffer, Font font) {
+    int scroll_line = 0;
+
+    int cursor_line = 0;
+    int cursor_column = 0;
+
+    EditMode mode = EditMode.Normal;
+    bool last_key_j = false;
+    MonoTime j_time;
+
+    this(Buffer buffer, Font font, int width, int height) {
         this.buffer = buffer;
         this.font = font;
-        scroll_line = 0;
-        cursor_line = 0;
-        cursor_column = 0;
+        resize(width, height);
     }
 
     void resize(int width, int height) {
@@ -226,6 +235,64 @@ class BufferView {
         }
     }
 
+    void onkey(SDL_Keysym keysym) {
+        final switch (mode) {
+        case EditMode.Insert:
+            char c = cast(char) keysym.sym;
+            insert(c);
+            if (c == 'j') {
+                last_key_j = true;
+                j_time = MonoTime.currTime;
+            }
+            if (c == 'k' && last_key_j && (MonoTime.currTime - j_time) <= dur!"msecs"(100)) {
+                mode = EditMode.Normal;
+            }
+            break;
+        case EditMode.Normal:
+            switch (keysym.sym) {
+            case SDLK_h:
+                movex(-1);
+                break;
+            case SDLK_j:
+                movey(1);
+                break;
+            case SDLK_k:
+                movey(-1);
+                break;
+            case SDLK_l:
+                movex(1);
+                break;
+            case SDLK_f:
+                if (keysym.mod & KMOD_CTRL) {
+                    movehalfpage(2);
+                }
+                break;
+            case SDLK_b:
+                if (keysym.mod & KMOD_CTRL) {
+                    movehalfpage(-2);
+                }
+                break;
+            case SDLK_d:
+                if (keysym.mod & KMOD_CTRL) {
+                    movehalfpage(1);
+                }
+                break;
+            case SDLK_u:
+                if (keysym.mod & KMOD_CTRL) {
+                    movehalfpage(-1);
+                }
+                break;
+
+            case SDLK_i:
+                mode = EditMode.Insert;
+                break;
+            default:
+                break;
+            }
+        }
+
+    }
+
 }
 
 void init_sdl() {
@@ -242,7 +309,7 @@ void main() {
     Window window = new Window();
     Buffer buffer = new Buffer("source/app.d");
     Font font = new Font(window.renderer, "fonts/PragmataPro Mono Regular.ttf", 16);
-    BufferView buffer_view = new BufferView(buffer, font);
+    BufferView buffer_view = new BufferView(buffer, font, window.width, window.height);
     window.clear(grey);
     bool running = true;
     while (running) {
@@ -265,44 +332,7 @@ void main() {
                 }
                 break;
             case SDL_KEYDOWN:
-                switch (event.key.keysym.sym) {
-                case SDLK_h:
-                    buffer_view.movex(-1);
-                    break;
-                case SDLK_j:
-                    buffer_view.movey(1);
-                    break;
-                case SDLK_k:
-                    buffer_view.movey(-1);
-                    break;
-                case SDLK_l:
-                    buffer_view.movex(1);
-                    break;
-                case SDLK_f:
-                    if (event.key.keysym.mod & KMOD_CTRL) {
-                        buffer_view.movehalfpage(2);
-                    } else {
-                        buffer_view.insert('f');
-                    }
-                    break;
-                case SDLK_b:
-                    if (event.key.keysym.mod & KMOD_CTRL) {
-                        buffer_view.movehalfpage(-2);
-                    }
-                    break;
-                case SDLK_d:
-                    if (event.key.keysym.mod & KMOD_CTRL) {
-                        buffer_view.movehalfpage(1);
-                    }
-                    break;
-                case SDLK_u:
-                    if (event.key.keysym.mod & KMOD_CTRL) {
-                        buffer_view.movehalfpage(-1);
-                    }
-                    break;
-                default:
-                    break;
-                }
+                buffer_view.onkey(event.key.keysym);
                 break;
             default:
                 break;
