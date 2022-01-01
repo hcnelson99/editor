@@ -266,17 +266,18 @@ class BufferView {
         final switch (mode) {
         case EditMode.Insert:
             char c = cast(char) keysym.sym;
-            if (c == 'j') {
-                last_key_j = true;
-                j_time = MonoTime.currTime;
-            }
             if (c == 'k' && k_will_exit()) {
                 mode = EditMode.Normal;
                 buffer.del(cursor_column, cursor_line);
                 movex(-1);
             } else {
                 insert(c);
-
+            }
+            if (c == 'j') {
+                last_key_j = true;
+                j_time = MonoTime.currTime;
+            } else {
+                last_key_j = false;
             }
             break;
         case EditMode.Normal:
