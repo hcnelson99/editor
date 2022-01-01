@@ -165,27 +165,21 @@ class BufferView {
             foreach (screen_x; 0 .. columns) {
                 int buffer_x = screen_x;
                 int buffer_y = scroll_line + screen_y;
-                Nullable!char c = buffer.get(buffer_x, buffer_y);
+                Nullable!char nc = buffer.get(buffer_x, buffer_y);
 
-                bool is_cursor = buffer_x == cursor_column && buffer_y == cursor_line;
-
-                if (c.isNull && is_cursor) {
-                    auto text = font.render(' ', grey, white);
-                    window.blit(text, screen_x * font.width, screen_y * font.height);
-                } else if (!c.isNull) {
-                    SDL_Color fg, bg;
-                    if (is_cursor) {
-                        fg = grey;
-                        bg = white;
-                    } else {
-                        fg = white;
-                        bg = grey;
-                    }
-                    auto text = font.render(c.get, fg, bg);
-                    window.blit(text, screen_x * font.width, screen_y * font.height);
-                }
+                char c = nc.isNull ? ' ' : nc.get;
+                auto text = font.render(c, white, grey);
+                window.blit(text, screen_x * font.width, screen_y * font.height);
             }
         }
+
+        int screen_x = cursor_column;
+        int screen_y = cursor_line - scroll_line;
+        Nullable!char cursor_char = buffer.get(cursor_column, cursor_line);
+        char c = cursor_char.isNull ? ' ' : cursor_char.get;
+        auto text = font.render(c, grey, white);
+        window.blit(text, screen_x * font.width, screen_y * font.height);
+
     }
 
     void movex(int dx) {
