@@ -73,6 +73,10 @@ class Buffer {
         lines[y] = lines[y][0 .. x] ~ s ~ lines[y][x .. $];
     }
 
+    void del(int x, int y) {
+        lines[y] = lines[y][0 .. x - 1] ~ lines[y][x .. $];
+    }
+
     int num_lines() {
         return cast(int) lines.length;
     }
@@ -239,13 +243,17 @@ class BufferView {
         final switch (mode) {
         case EditMode.Insert:
             char c = cast(char) keysym.sym;
-            insert(c);
             if (c == 'j') {
                 last_key_j = true;
                 j_time = MonoTime.currTime;
             }
-            if (c == 'k' && last_key_j && (MonoTime.currTime - j_time) <= dur!"msecs"(100)) {
+            if (c == 'k' && last_key_j && (MonoTime.currTime - j_time) <= dur!"msecs"(200)) {
                 mode = EditMode.Normal;
+                buffer.del(cursor_column, cursor_line);
+                movex(-1);
+            } else {
+                insert(c);
+
             }
             break;
         case EditMode.Normal:
