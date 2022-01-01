@@ -27,8 +27,13 @@ class Window {
         this.height = height;
     }
 
-    void clear(SDL_Color color) {
+    void set_color(SDL_Color color) {
         SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
+
+    }
+
+    void clear(SDL_Color color) {
+        set_color(color);
         SDL_RenderClear(renderer);
     }
 
@@ -37,6 +42,11 @@ class Window {
         SDL_QueryTexture(texture, null, null, &w, &h);
         SDL_Rect dst = SDL_Rect(x, y, w, h);
         enforce(SDL_RenderCopy(renderer, texture, null, &dst) == 0);
+    }
+
+    void rect(SDL_Color color, SDL_Rect rect) {
+        set_color(color);
+        SDL_RenderFillRect(renderer, &rect);
     }
 
     void redraw() {
@@ -154,10 +164,36 @@ class BufferView {
         resize(width, height);
     }
 
+    bool k_will_exit() {
+        return last_key_j && (MonoTime.currTime - j_time) <= dur!"msecs"(200);
+    }
+
     void resize(int width, int height) {
         rows = height / font.height;
         columns = width / font.width;
         scroll();
+    }
+
+    void draw_cursor(Window window) {
+        int screen_x = cursor_column;
+        if (mode == EditMode.Insert && k_will_exit) {
+            screen_x--;
+        }
+        int screen_y = cursor_line - scroll_line;
+        int pixel_x = screen_x * font.width;
+        int pixel_y = screen_y * font.height;
+        final switch (mode) {
+        case EditMode.Normal:
+            Nullable!char cursor_char = buffer.get(cursor_column, cursor_line);
+            char c = cursor_char.isNull ? ' ' : cursor_char.get;
+            auto text = font.render(c, grey, white);
+            window.blit(text, pixel_x, pixel_y);
+            break;
+        case EditMode.Insert:
+            window.rect(white, SDL_Rect(pixel_x, pixel_y,
+                    font.width / 5, font.height));
+            break;
+        }
     }
 
     void render(Window window) {
@@ -166,20 +202,13 @@ class BufferView {
                 int buffer_x = screen_x;
                 int buffer_y = scroll_line + screen_y;
                 Nullable!char nc = buffer.get(buffer_x, buffer_y);
-
                 char c = nc.isNull ? ' ' : nc.get;
                 auto text = font.render(c, white, grey);
                 window.blit(text, screen_x * font.width, screen_y * font.height);
             }
         }
 
-        int screen_x = cursor_column;
-        int screen_y = cursor_line - scroll_line;
-        Nullable!char cursor_char = buffer.get(cursor_column, cursor_line);
-        char c = cursor_char.isNull ? ' ' : cursor_char.get;
-        auto text = font.render(c, grey, white);
-        window.blit(text, screen_x * font.width, screen_y * font.height);
-
+        draw_cursor(window);
     }
 
     void movex(int dx) {
@@ -241,7 +270,7 @@ class BufferView {
                 last_key_j = true;
                 j_time = MonoTime.currTime;
             }
-            if (c == 'k' && last_key_j && (MonoTime.currTime - j_time) <= dur!"msecs"(200)) {
+            if (c == 'k' && k_will_exit()) {
                 mode = EditMode.Normal;
                 buffer.del(cursor_column, cursor_line);
                 movex(-1);
@@ -284,7 +313,6 @@ class BufferView {
                     movehalfpage(-1);
                 }
                 break;
-
             case SDLK_i:
                 mode = EditMode.Insert;
                 break;
