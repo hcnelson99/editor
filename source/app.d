@@ -212,20 +212,7 @@ class BufferView {
         draw_cursor(window);
     }
 
-    void movex(int dx) {
-        cursor_column += dx;
-        if (cursor_column > columns) {
-            cursor_column = columns;
-        }
-        if (cursor_column < 0) {
-            cursor_column = 0;
-        }
-
-        scroll();
-    }
-
-    void movey(int dy) {
-        cursor_line += dy;
+    void position_cursor() {
         if (cursor_line < 0) {
             cursor_line = 0;
         }
@@ -233,12 +220,40 @@ class BufferView {
         if (cursor_line > buffer.num_lines() - 1) {
             cursor_line = buffer.num_lines() - 1;
         }
+
+        int x_max = min(columns, buffer.lines[cursor_line].length);
+
+        if (cursor_column > x_max) {
+            cursor_column = x_max;
+        }
+        if (cursor_column < 0) {
+            cursor_column = 0;
+        }
         scroll();
+
+    }
+
+    void movex(int dx) {
+        cursor_column += dx;
+
+        position_cursor();
+    }
+
+    void movey(int dy) {
+        cursor_line += dy;
+        position_cursor();
     }
 
     void insert(char c) {
         buffer.insert(c, cursor_column, cursor_line);
         movex(1);
+    }
+
+    void del() {
+        if (cursor_column > 0) {
+            buffer.del(cursor_column, cursor_line);
+            movex(-1);
+        }
     }
 
     void movehalfpage(int dir) {
@@ -266,8 +281,7 @@ class BufferView {
     void insert_mode_key(char c) {
         if (c == 'k' && k_will_exit()) {
             mode = EditMode.Normal;
-            buffer.del(cursor_column, cursor_line);
-            movex(-1);
+            del();
         } else {
             insert(c);
         }
@@ -284,8 +298,7 @@ class BufferView {
         final switch (mode) {
         case EditMode.Insert:
             if (keysym.sym == SDLK_BACKSPACE) {
-                buffer.del(cursor_column, cursor_line);
-                movex(-1);
+                del();
             }
             break;
         case EditMode.Normal:
