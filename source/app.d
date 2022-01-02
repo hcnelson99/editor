@@ -263,16 +263,7 @@ class BufferView {
         }
     }
 
-    void insert_mode_key(SDL_Keysym keysym) {
-        if (!std.ascii.isPrintable(keysym.sym)) {
-            return;
-        }
-        char c = cast(char) keysym.sym;
-        if (keysym.mod & KMOD_SHIFT) {
-            // need to use sdl text input
-            c = std.ascii.toUpper(c);
-        }
-
+    void insert_mode_key(char c) {
         if (c == 'k' && k_will_exit()) {
             mode = EditMode.Normal;
             buffer.del(cursor_column, cursor_line);
@@ -289,46 +280,50 @@ class BufferView {
 
     }
 
-    void onkey(SDL_Keysym keysym) {
+    void onshortcut(SDL_Keysym keysym) {
         final switch (mode) {
         case EditMode.Insert:
-            insert_mode_key(keysym);
+            if (keysym.sym == SDLK_BACKSPACE) {
+                buffer.del(cursor_column, cursor_line);
+                movex(-1);
+            }
             break;
         case EditMode.Normal:
-            switch (keysym.sym) {
-            case SDLK_h:
+            if (keysym.sym == SDLK_f && keysym.mod & KMOD_CTRL) {
+                movehalfpage(2);
+            }
+            if (keysym.sym == SDLK_b && keysym.mod & KMOD_CTRL) {
+                movehalfpage(-2);
+            }
+            if (keysym.sym == SDLK_d && keysym.mod & KMOD_CTRL) {
+                movehalfpage(1);
+            }
+            if (keysym.sym == SDLK_u && keysym.mod & KMOD_CTRL) {
+                movehalfpage(-1);
+            }
+        }
+    }
+
+    void onkey(char c) {
+        final switch (mode) {
+        case EditMode.Insert:
+            insert_mode_key(c);
+            break;
+        case EditMode.Normal:
+            switch (c) {
+            case 'h':
                 movex(-1);
                 break;
-            case SDLK_j:
+            case 'j':
                 movey(1);
                 break;
-            case SDLK_k:
+            case 'k':
                 movey(-1);
                 break;
-            case SDLK_l:
+            case 'l':
                 movex(1);
                 break;
-            case SDLK_f:
-                if (keysym.mod & KMOD_CTRL) {
-                    movehalfpage(2);
-                }
-                break;
-            case SDLK_b:
-                if (keysym.mod & KMOD_CTRL) {
-                    movehalfpage(-2);
-                }
-                break;
-            case SDLK_d:
-                if (keysym.mod & KMOD_CTRL) {
-                    movehalfpage(1);
-                }
-                break;
-            case SDLK_u:
-                if (keysym.mod & KMOD_CTRL) {
-                    movehalfpage(-1);
-                }
-                break;
-            case SDLK_i:
+            case 'i':
                 mode = EditMode.Insert;
                 break;
             default:
@@ -355,7 +350,8 @@ void main() {
     Buffer buffer = new Buffer("source/app.d");
     Font font = new Font(window.renderer, "fonts/PragmataPro Mono Regular.ttf", 16);
     BufferView buffer_view = new BufferView(buffer, font, window.width, window.height);
-    window.clear(grey);
+
+    SDL_StartTextInput();
     bool running = true;
     while (running) {
         SDL_Event event;
@@ -377,7 +373,13 @@ void main() {
                 }
                 break;
             case SDL_KEYDOWN:
-                buffer_view.onkey(event.key.keysym);
+                buffer_view.onshortcut(event.key.keysym);
+                break;
+
+            case SDL_TEXTINPUT:
+                foreach (char c; fromStringz(event.text.text)) {
+                    buffer_view.onkey(c);
+                }
                 break;
             default:
                 break;
