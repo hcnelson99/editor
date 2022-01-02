@@ -264,17 +264,17 @@ class BufferView {
 
     const int scrolloff = 2;
     void scroll() {
-        if (cursor_line - scroll_line < scrolloff) {
-            scroll_line = cursor_line - scrolloff;
-        }
         if (cursor_line - scroll_line > rows - scrolloff) {
             scroll_line = cursor_line - rows + scrolloff;
         }
-        if (scroll_line < 0) {
-            scroll_line = 0;
+        if (cursor_line - scroll_line < scrolloff) {
+            scroll_line = cursor_line - scrolloff;
         }
         if (scroll_line + rows > buffer.num_lines()) {
             scroll_line = buffer.num_lines() - rows;
+        }
+        if (scroll_line < 0) {
+            scroll_line = 0;
         }
     }
 
@@ -297,22 +297,42 @@ class BufferView {
     void onshortcut(SDL_Keysym keysym) {
         final switch (mode) {
         case EditMode.Insert:
-            if (keysym.sym == SDLK_BACKSPACE) {
+            switch (keysym.sym) {
+            case SDLK_BACKSPACE:
                 del();
+                break;
+            case SDLK_ESCAPE:
+                mode = EditMode.Normal;
+                break;
+            default:
+                break;
             }
             break;
+
         case EditMode.Normal:
-            if (keysym.sym == SDLK_f && keysym.mod & KMOD_CTRL) {
-                movehalfpage(2);
-            }
-            if (keysym.sym == SDLK_b && keysym.mod & KMOD_CTRL) {
-                movehalfpage(-2);
-            }
-            if (keysym.sym == SDLK_d && keysym.mod & KMOD_CTRL) {
-                movehalfpage(1);
-            }
-            if (keysym.sym == SDLK_u && keysym.mod & KMOD_CTRL) {
-                movehalfpage(-1);
+            switch (keysym.sym) {
+            case SDLK_f:
+                if (keysym.mod & KMOD_CTRL) {
+                    movehalfpage(2);
+                }
+                break;
+            case SDLK_b:
+                if (keysym.mod & KMOD_CTRL) {
+                    movehalfpage(-2);
+                }
+                break;
+            case SDLK_d:
+                if (keysym.mod & KMOD_CTRL) {
+                    movehalfpage(1);
+                }
+                break;
+            case SDLK_u:
+                if (keysym.mod & KMOD_CTRL) {
+                    movehalfpage(-1);
+                }
+                break;
+            default:
+                break;
             }
         }
     }
@@ -357,10 +377,15 @@ void init_sdl() {
 
 }
 
-void main() {
+int main(string[] args) {
+    if (args.length != 2) {
+        writeln("usage: editor FILENAME");
+        return 1;
+    }
+
     init_sdl();
     Window window = new Window();
-    Buffer buffer = new Buffer("source/app.d");
+    Buffer buffer = new Buffer(args[1]);
     Font font = new Font(window.renderer, "fonts/PragmataPro Mono Regular.ttf", 16);
     BufferView buffer_view = new BufferView(buffer, font, window.width, window.height);
 
@@ -404,4 +429,5 @@ void main() {
 
         window.redraw();
     }
+    return 0;
 }
