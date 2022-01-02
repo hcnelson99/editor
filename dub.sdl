@@ -5,4 +5,7 @@ copyright "Copyright © 2021, hcnelson99"
 license "proprietary"
 
 dependency "bindbc-sdl" version="~>1.0.1"
-versions "SDL_TTF"
+versions "BindSDL_Static" "SDL_TTF" "SDL_No_Atomics"
+libs "SDL2" "SDL2_ttf"
+
+stringImportPaths "./fonts/"

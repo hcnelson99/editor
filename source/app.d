@@ -108,9 +108,12 @@ class Font {
 
     SDL_Texture*[ColoredGlyph] glyph_cache;
 
-    this(SDL_Renderer* renderer, string font_path, int size) {
+    this(SDL_Renderer* renderer, string font_contents, int size) {
         this.renderer = renderer;
-        font = TTF_OpenFont(toStringz(font_path), size);
+
+        SDL_RWops* rw = SDL_RWFromConstMem(cast(void*) font_contents.ptr,
+                cast(int) font_contents.length);
+        font = TTF_OpenFontRW(rw, 0, size);
         enforce(font);
 
         enforce(TTF_SizeText(font, " ", &width, &height) == 0);
@@ -154,6 +157,7 @@ class BufferView {
 
     int cursor_line = 0;
     int cursor_column = 0;
+    int want_cursor_column = 0;
 
     EditMode mode = EditMode.Normal;
     bool last_key_j = false;
@@ -229,8 +233,8 @@ class BufferView {
         if (cursor_column < 0) {
             cursor_column = 0;
         }
-        scroll();
 
+        scroll();
     }
 
     void movex(int dx) {
@@ -369,13 +373,14 @@ class BufferView {
 }
 
 void init_sdl() {
-    enforce(loadSDL() == sdlSupport);
-    enforce(loadSDLTTF() == sdlTTFSupport);
+    // enforce(loadSDL() == sdlSupport);
+    // enforce(loadSDLTTF() == sdlTTFSupport);
 
     enforce(SDL_Init(SDL_INIT_VIDEO) == 0);
     enforce(TTF_Init() == 0);
-
 }
+
+string pragmata_pro_regular = import("PragmataPro Mono Regular.ttf");
 
 int main(string[] args) {
     if (args.length != 2) {
@@ -386,7 +391,7 @@ int main(string[] args) {
     init_sdl();
     Window window = new Window();
     Buffer buffer = new Buffer(args[1]);
-    Font font = new Font(window.renderer, "fonts/PragmataPro Mono Regular.ttf", 16);
+    Font font = new Font(window.renderer, pragmata_pro_regular, 16);
     BufferView buffer_view = new BufferView(buffer, font, window.width, window.height);
 
     SDL_StartTextInput();
