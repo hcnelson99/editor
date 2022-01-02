@@ -441,7 +441,7 @@ int main(string[] args) {
                 break;
 
             case SDL_TEXTINPUT:
-                foreach (char c; fromStringz(event.text.text)) {
+                foreach (char c; fromStringz(event.text.text.ptr)) {
                     buffer_view.onkey(c);
                 }
                 break;
