@@ -221,14 +221,17 @@ class BufferView {
             cursor_line = 0;
         }
 
-        if (cursor_line > buffer.num_lines() - 1) {
-            cursor_line = buffer.num_lines() - 1;
+        int adjust = mode == EditMode.Normal ? 1 : 0;
+
+        if (cursor_line > buffer.num_lines() - adjust) {
+            cursor_line = buffer.num_lines() - adjust;
         }
 
         int x_max = min(columns, buffer.lines[cursor_line].length);
 
-        if (cursor_column > x_max) {
-            cursor_column = x_max;
+        cursor_column = want_cursor_column;
+        if (cursor_column > x_max - adjust) {
+            cursor_column = x_max - adjust;
         }
         if (cursor_column < 0) {
             cursor_column = 0;
@@ -238,7 +241,8 @@ class BufferView {
     }
 
     void movex(int dx) {
-        cursor_column += dx;
+        want_cursor_column = cursor_column;
+        want_cursor_column += dx;
 
         position_cursor();
     }
@@ -299,6 +303,23 @@ class BufferView {
     }
 
     void onshortcut(SDL_Keysym keysym) {
+        switch (keysym.sym) {
+        case SDLK_LEFT:
+            movex(-1);
+            break;
+        case SDLK_RIGHT:
+            movex(1);
+            break;
+        case SDLK_UP:
+            movey(-1);
+            break;
+        case SDLK_DOWN:
+            movey(1);
+            break;
+        default:
+            break;
+        }
+
         final switch (mode) {
         case EditMode.Insert:
             switch (keysym.sym) {
