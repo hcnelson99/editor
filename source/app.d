@@ -56,9 +56,13 @@ class Window {
 }
 
 class Buffer {
+    string filename;
     string[] lines;
 
+    bool dirty = false;
+
     this(string filename) {
+        this.filename = filename;
         auto file = File(filename);
         lines = file.byLine().map!(x => x.idup).array;
     }
@@ -83,24 +87,32 @@ class Buffer {
         string prev_line = lines[y][0 .. x];
         string line = lines[y][x .. $];
         lines = lines[0 .. y] ~ prev_line ~ line ~ lines[y + 1 .. $];
-
+        dirty = true;
     }
 
     void insert(char c, int x, int y) {
         string s = [c];
         lines[y] = lines[y][0 .. x] ~ s ~ lines[y][x .. $];
+        dirty = true;
     }
 
     void join_with_prev_line(int y) {
         lines = lines[0 .. y - 1] ~ (lines[y - 1] ~ lines[y]) ~ lines[y + 1 .. $];
+        dirty = true;
     }
 
     void del(int x, int y) {
         lines[y] = lines[y][0 .. x - 1] ~ lines[y][x .. $];
+        dirty = true;
     }
 
     int num_lines() {
         return cast(int) lines.length;
+    }
+
+    void save() {
+        toFile(join(lines, "\n"), filename);
+        dirty = false;
     }
 }
 
@@ -173,6 +185,8 @@ class BufferView {
     EditMode mode = EditMode.Normal;
     bool last_key_j = false;
     MonoTime j_time;
+
+    bool last_key_space = false;
 
     this(Buffer buffer, Font font, int width, int height) {
         this.buffer = buffer;
@@ -328,7 +342,7 @@ class BufferView {
 
     }
 
-    void onshortcut(SDL_Keysym keysym) {
+    bool onshortcut(SDL_Keysym keysym) {
         switch (keysym.sym) {
         case SDLK_LEFT:
             movex(-1);
@@ -364,31 +378,52 @@ class BufferView {
             break;
 
         case EditMode.Normal:
-            switch (keysym.sym) {
-            case SDLK_f:
-                if (keysym.mod & KMOD_CTRL) {
-                    movehalfpage(2);
+            if (last_key_space) {
+                switch (keysym.sym) {
+                case SDLK_q:
+                    if (!buffer.dirty) {
+                        return true;
+                    }
+                    break;
+                case SDLK_w:
+                    buffer.save();
+                    break;
+                default:
+                    break;
                 }
-                break;
-            case SDLK_b:
-                if (keysym.mod & KMOD_CTRL) {
-                    movehalfpage(-2);
+            } else {
+                last_key_space = false;
+                switch (keysym.sym) {
+                case SDLK_SPACE:
+                    last_key_space = true;
+                    break;
+                case SDLK_f:
+                    if (keysym.mod & KMOD_CTRL) {
+                        movehalfpage(2);
+                    }
+                    break;
+                case SDLK_b:
+                    if (keysym.mod & KMOD_CTRL) {
+                        movehalfpage(-2);
+                    }
+                    break;
+                case SDLK_d:
+                    if (keysym.mod & KMOD_CTRL) {
+                        movehalfpage(1);
+                    }
+                    break;
+                case SDLK_u:
+                    if (keysym.mod & KMOD_CTRL) {
+                        movehalfpage(-1);
+                    }
+                    break;
+                default:
+                    break;
                 }
-                break;
-            case SDLK_d:
-                if (keysym.mod & KMOD_CTRL) {
-                    movehalfpage(1);
-                }
-                break;
-            case SDLK_u:
-                if (keysym.mod & KMOD_CTRL) {
-                    movehalfpage(-1);
-                }
-                break;
-            default:
-                break;
             }
         }
+
+        return false;
     }
 
     void onkey(char c) {
@@ -466,7 +501,10 @@ int main(string[] args) {
                 }
                 break;
             case SDL_KEYDOWN:
-                buffer_view.onshortcut(event.key.keysym);
+                bool exit = buffer_view.onshortcut(event.key.keysym);
+                if (exit) {
+                    running = false;
+                }
                 break;
 
             case SDL_TEXTINPUT:
