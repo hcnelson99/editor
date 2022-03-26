@@ -79,9 +79,20 @@ class Buffer {
         return result;
     }
 
+    void insert_line(int x, int y) {
+        string prev_line = lines[y][0 .. x];
+        string line = lines[y][x .. $];
+        lines = lines[0 .. y] ~ prev_line ~ line ~ lines[y + 1 .. $];
+
+    }
+
     void insert(char c, int x, int y) {
         string s = [c];
         lines[y] = lines[y][0 .. x] ~ s ~ lines[y][x .. $];
+    }
+
+    void join_with_prev_line(int y) {
+        lines = lines[0 .. y - 1] ~ (lines[y - 1] ~ lines[y]) ~ lines[y + 1 .. $];
     }
 
     void del(int x, int y) {
@@ -253,12 +264,27 @@ class BufferView {
     }
 
     void insert(char c) {
-        buffer.insert(c, cursor_column, cursor_line);
-        movex(1);
+        if (c == '\n') {
+            buffer.insert_line(cursor_column, cursor_line);
+            cursor_line += 1;
+            want_cursor_column = 0;
+            position_cursor();
+        } else {
+            buffer.insert(c, cursor_column, cursor_line);
+            movex(1);
+        }
     }
 
     void del() {
-        if (cursor_column > 0) {
+        if (cursor_column == 0) {
+            if (cursor_line > 0) {
+                int line_length = cast(int)(buffer.lines[cursor_line - 1].length);
+                buffer.join_with_prev_line(cursor_line);
+                cursor_line -= 1;
+                want_cursor_column = line_length;
+                position_cursor();
+            }
+        } else {
             buffer.del(cursor_column, cursor_line);
             movex(-1);
         }
@@ -328,6 +354,9 @@ class BufferView {
                 break;
             case SDLK_ESCAPE:
                 mode = EditMode.Normal;
+                break;
+            case SDLK_RETURN:
+                insert('\n');
                 break;
             default:
                 break;
