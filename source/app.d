@@ -106,6 +106,10 @@ class Buffer {
         dirty = true;
     }
 
+    int line_length(int y) {
+        return cast(int)(lines[y].length);
+    }
+
     int num_lines() {
         return cast(int) lines.length;
     }
@@ -272,6 +276,23 @@ class BufferView {
         position_cursor();
     }
 
+    // TODO: use this to implement w, b, e, etc
+    void movex_wrap(int dx) {
+        want_cursor_column = cursor_column;
+        want_cursor_column += dx;
+
+        if (want_cursor_column >= buffer.line_length(cursor_line)
+                && cursor_line < buffer.num_lines() - 1) {
+            want_cursor_column = 0;
+            cursor_line += 1;
+        } else if (want_cursor_column < 0 && cursor_line > 0) {
+            cursor_line -= 1;
+            want_cursor_column = buffer.line_length(cursor_line);
+        }
+
+        position_cursor();
+    }
+
     void movey(int dy) {
         cursor_line += dy;
         position_cursor();
@@ -292,7 +313,7 @@ class BufferView {
     void del() {
         if (cursor_column == 0) {
             if (cursor_line > 0) {
-                int line_length = cast(int)(buffer.lines[cursor_line - 1].length);
+                int line_length = buffer.line_length(cursor_line);
                 buffer.join_with_prev_line(cursor_line);
                 cursor_line -= 1;
                 want_cursor_column = line_length;
@@ -376,7 +397,6 @@ class BufferView {
                 break;
             }
             break;
-
         case EditMode.Normal:
             if (last_key_space) {
                 switch (keysym.sym) {
