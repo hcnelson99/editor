@@ -276,8 +276,13 @@ class BufferView {
         position_cursor();
     }
 
-    // TODO: use this to implement w, b, e, etc
-    void movex_wrap(int dx) {
+    // TODO doesn't work for going backward. we should probably just write a
+    // function that says whether or not the current character is the start of
+    // a word. 
+    bool movex_wrap(int dx) {
+        int before_cursor_column = cursor_column;
+        int before_cursor_line = cursor_line;
+
         want_cursor_column = cursor_column;
         want_cursor_column += dx;
 
@@ -291,6 +296,60 @@ class BufferView {
         }
 
         position_cursor();
+
+        return !(before_cursor_column == cursor_column && before_cursor_line == cursor_line);
+    }
+
+    Nullable!(char) current_char() {
+        return buffer.get(cursor_column, cursor_line);
+    }
+
+    enum CharType {
+        Whitespace,
+        Symbol,
+        Word
+    }
+
+    CharType classify_current_char() {
+        Nullable!(char) current_char = current_char();
+
+        if (current_char.isNull || std.ascii.isWhite(current_char.get)) {
+            return CharType.Whitespace;
+        }
+
+        if (std.ascii.isAlphaNum(current_char.get) || current_char == '_') {
+            return CharType.Word;
+        }
+        return CharType.Symbol;
+    }
+
+    bool is_word_state // Unlike vim, we don't consider an empty line to be a word. Is that the right choice?
+    void word(int dx) {
+        CharType start_type = classify_current_char();
+
+        bool seen_whitespace = false;
+
+        CharType current_char_type;
+        while (true) {
+            if (!movex_wrap(dx)) {
+                break;
+            }
+
+            current_char_type = classify_current_char();
+            if (current_char_type == CharType.Whitespace) {
+                seen_whitespace = true;
+            }
+
+            if (seen_whitespace) {
+                if (current_char_type != CharType.Whitespace) {
+                    break;
+                }
+            } else {
+                if (current_char_type != start_type) {
+                    break;
+                }
+            }
+        }
     }
 
     void movey(int dy) {
@@ -399,6 +458,7 @@ class BufferView {
             break;
         case EditMode.Normal:
             if (last_key_space) {
+                last_key_space = false;
                 switch (keysym.sym) {
                 case SDLK_q:
                     if (!buffer.dirty) {
@@ -425,6 +485,8 @@ class BufferView {
                 case SDLK_b:
                     if (keysym.mod & KMOD_CTRL) {
                         movehalfpage(-2);
+                    } else {
+                        word(-1);
                     }
                     break;
                 case SDLK_d:
@@ -436,6 +498,9 @@ class BufferView {
                     if (keysym.mod & KMOD_CTRL) {
                         movehalfpage(-1);
                     }
+                    break;
+                case SDLK_w:
+                    word(1);
                     break;
                 default:
                     break;
