@@ -323,7 +323,6 @@ class BufferView {
         return CharType.Symbol;
     }
 
-    bool is_word_state // Unlike vim, we don't consider an empty line to be a word. Is that the right choice?
     void word(int dx) {
         CharType start_type = classify_current_char();
 
