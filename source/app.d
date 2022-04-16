@@ -1,13 +1,14 @@
 import std.stdio;
 static import std.ascii;
+import std.algorithm : min;
 import std.array;
-import std.algorithm;
 import std.exception : enforce;
-import std.typecons : Nullable, nullable;
 import std.string;
 import core.time;
 import bindbc.sdl;
 import bindbc.sdl.ttf;
+
+import buffer;
 
 class Window {
     SDL_Window* window;
@@ -52,71 +53,6 @@ class Window {
 
     void redraw() {
         SDL_RenderPresent(renderer);
-    }
-}
-
-class Buffer {
-    string filename;
-    string[] lines;
-
-    bool dirty = false;
-
-    this(string filename) {
-        this.filename = filename;
-        auto file = File(filename);
-        lines = file.byLine().map!(x => x.idup).array;
-    }
-
-    Nullable!(char) get(int x, int y) {
-        Nullable!char result;
-
-        enforce(x >= 0 && y >= 0);
-        if (y >= lines.length) {
-            return result;
-        }
-
-        string line = lines[y];
-        if (x >= line.length) {
-            return result;
-        }
-        result = line[x];
-        return result;
-    }
-
-    void insert_line(int x, int y) {
-        string prev_line = lines[y][0 .. x];
-        string line = lines[y][x .. $];
-        lines = lines[0 .. y] ~ prev_line ~ line ~ lines[y + 1 .. $];
-        dirty = true;
-    }
-
-    void insert(char c, int x, int y) {
-        string s = [c];
-        lines[y] = lines[y][0 .. x] ~ s ~ lines[y][x .. $];
-        dirty = true;
-    }
-
-    void join_with_prev_line(int y) {
-        lines = lines[0 .. y - 1] ~ (lines[y - 1] ~ lines[y]) ~ lines[y + 1 .. $];
-        dirty = true;
-    }
-
-    void del(int x, int y) {
-        lines[y] = lines[y][0 .. x - 1] ~ lines[y][x .. $];
-        dirty = true;
-    }
-
-    int line_length(int y) {
-        return cast(int)(lines[y].length);
-    }
-
-    int num_lines() {
-        return cast(int) lines.length;
-    }
-
-    void save() {
-        toFile(join(lines, "\n"), filename);
-        dirty = false;
     }
 }
 
@@ -218,8 +154,8 @@ class BufferView {
         int pixel_y = screen_y * font.height;
         final switch (mode) {
         case EditMode.Normal:
-            Nullable!char cursor_char = buffer.get(cursor_column, cursor_line);
-            char c = cursor_char.isNull ? ' ' : cursor_char.get;
+            int i = buffer.index_of_pos(cursor_line, cursor_column);
+            char c = i == -1 ? ' ' : buffer.get(i);
             auto text = font.render(c, grey, white);
             window.blit(text, pixel_x, pixel_y);
             break;
@@ -233,10 +169,10 @@ class BufferView {
     void render(Window window) {
         foreach (screen_y; 0 .. rows) {
             foreach (screen_x; 0 .. columns) {
-                int buffer_x = screen_x;
-                int buffer_y = scroll_line + screen_y;
-                Nullable!char nc = buffer.get(buffer_x, buffer_y);
-                char c = nc.isNull ? ' ' : nc.get;
+                int buffer_col = screen_x;
+                int buffer_row = scroll_line + screen_y;
+                int i = buffer.index_of_pos(buffer_row, buffer_col);
+                char c = i == -1 ? ' ' : buffer.get(i);
                 auto text = font.render(c, white, grey);
                 window.blit(text, screen_x * font.width, screen_y * font.height);
             }
@@ -256,7 +192,7 @@ class BufferView {
             cursor_line = buffer.num_lines() - adjust;
         }
 
-        int x_max = min(columns, buffer.lines[cursor_line].length);
+        int x_max = min(columns, buffer.line_length(cursor_line));
 
         cursor_column = want_cursor_column;
         if (cursor_column > x_max - adjust) {
@@ -276,94 +212,19 @@ class BufferView {
         position_cursor();
     }
 
-    // TODO doesn't work for going backward. we should probably just write a
-    // function that says whether or not the current character is the start of
-    // a word. 
-    bool movex_wrap(int dx) {
-        int before_cursor_column = cursor_column;
-        int before_cursor_line = cursor_line;
-
-        want_cursor_column = cursor_column;
-        want_cursor_column += dx;
-
-        if (want_cursor_column >= buffer.line_length(cursor_line)
-                && cursor_line < buffer.num_lines() - 1) {
-            want_cursor_column = 0;
-            cursor_line += 1;
-        } else if (want_cursor_column < 0 && cursor_line > 0) {
-            cursor_line -= 1;
-            want_cursor_column = buffer.line_length(cursor_line);
-        }
-
-        position_cursor();
-
-        return !(before_cursor_column == cursor_column && before_cursor_line == cursor_line);
-    }
-
-    Nullable!(char) current_char() {
-        return buffer.get(cursor_column, cursor_line);
-    }
-
-    enum CharType {
-        Whitespace,
-        Symbol,
-        Word
-    }
-
-    CharType classify_current_char() {
-        Nullable!(char) current_char = current_char();
-
-        if (current_char.isNull || std.ascii.isWhite(current_char.get)) {
-            return CharType.Whitespace;
-        }
-
-        if (std.ascii.isAlphaNum(current_char.get) || current_char == '_') {
-            return CharType.Word;
-        }
-        return CharType.Symbol;
-    }
-
-    void word(int dx) {
-        CharType start_type = classify_current_char();
-
-        bool seen_whitespace = false;
-
-        CharType current_char_type;
-        while (true) {
-            if (!movex_wrap(dx)) {
-                break;
-            }
-
-            current_char_type = classify_current_char();
-            if (current_char_type == CharType.Whitespace) {
-                seen_whitespace = true;
-            }
-
-            if (seen_whitespace) {
-                if (current_char_type != CharType.Whitespace) {
-                    break;
-                }
-            } else {
-                if (current_char_type != start_type) {
-                    break;
-                }
-            }
-        }
-    }
-
     void movey(int dy) {
         cursor_line += dy;
         position_cursor();
     }
 
     void insert(char c) {
+        int i = buffer.index_of_pos(cursor_column, cursor_line);
+        buffer.insert(c, i);
         if (c == '\n') {
-            buffer.insert_line(cursor_column, cursor_line);
             cursor_line += 1;
             want_cursor_column = 0;
             position_cursor();
         } else {
-            buffer.insert(c, cursor_column, cursor_line);
             movex(1);
         }
     }
