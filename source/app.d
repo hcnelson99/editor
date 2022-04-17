@@ -9,6 +9,7 @@ import bindbc.sdl;
 import bindbc.sdl.ttf;
 
 import buffer;
+import cursor;
 
 class Window {
     SDL_Window* window;
@@ -100,10 +101,6 @@ class Font {
     }
 }
 
-struct Pos {
-    int x, y;
-};
-
 enum EditMode {
     Insert,
     Normal
@@ -118,9 +115,7 @@ class BufferView {
 
     int scroll_line = 0;
 
-    int cursor_line = 0;
-    int cursor_column = 0;
-    int want_cursor_column = 0;
+    Cursor cursor;
 
     EditMode mode = EditMode.Normal;
     bool last_key_j = false;
@@ -131,6 +126,7 @@ class BufferView {
     this(Buffer buffer, Font font, int width, int height) {
         this.buffer = buffer;
         this.font = font;
+        this.cursor = new Cursor(buffer);
         resize(width, height);
     }
 
@@ -141,21 +137,20 @@ class BufferView {
     void resize(int width, int height) {
         rows = height / font.height;
         columns = width / font.width;
-        scroll();
+        /* scroll(); */
     }
 
     void draw_cursor(Window window) {
-        int screen_x = cursor_column;
+        int screen_x = cursor.pos.col;
         if (mode == EditMode.Insert && k_will_exit) {
             screen_x--;
         }
-        int screen_y = cursor_line - scroll_line;
+        int screen_y = cursor.pos.row - scroll_line;
         int pixel_x = screen_x * font.width;
         int pixel_y = screen_y * font.height;
         final switch (mode) {
         case EditMode.Normal:
-            int i = buffer.index_of_pos(cursor_line, cursor_column);
-            char c = i == -1 ? ' ' : buffer.get(i);
+            char c = cursor.index == -1 ? ' ' : buffer.get(cursor.index);
             auto text = font.render(c, grey, white);
             window.blit(text, pixel_x, pixel_y);
             break;
@@ -171,7 +166,7 @@ class BufferView {
             foreach (screen_x; 0 .. columns) {
                 int buffer_col = screen_x;
                 int buffer_row = scroll_line + screen_y;
-                int i = buffer.index_of_pos(buffer_row, buffer_col);
+                int i = buffer.index_of_pos(Pos(buffer_row, buffer_col));
                 char c = i == -1 ? ' ' : buffer.get(i);
                 auto text = font.render(c, white, grey);
                 window.blit(text, screen_x * font.width, screen_y * font.height);
@@ -181,97 +176,34 @@ class BufferView {
         draw_cursor(window);
     }
 
-    void position_cursor() {
-        if (cursor_line < 0) {
-            cursor_line = 0;
-        }
+    /* void movehalfpage(int dir) { */
+    /*     int amount = dir * rows / 2; */
+    /*     scroll_line += amount; */
+    /*     movey(amount); */
+    /* } */
 
-        int adjust = mode == EditMode.Normal ? 1 : 0;
-
-        if (cursor_line > buffer.num_lines() - adjust) {
-            cursor_line = buffer.num_lines() - adjust;
-        }
-
-        int x_max = min(columns, buffer.line_length(cursor_line));
-
-        cursor_column = want_cursor_column;
-        if (cursor_column > x_max - adjust) {
-            cursor_column = x_max - adjust;
-        }
-        if (cursor_column < 0) {
-            cursor_column = 0;
-        }
-
-        scroll();
-    }
-
-    void movex(int dx) {
-        want_cursor_column = cursor_column;
-        want_cursor_column += dx;
-
-        position_cursor();
-    }
-
-    void movey(int dy) {
-        cursor_line += dy;
-        position_cursor();
-    }
-
-    void insert(char c) {
-        int i = buffer.index_of_pos(cursor_column, cursor_line);
-        buffer.insert(c, i);
-        if (c == '\n') {
-            cursor_line += 1;
-            want_cursor_column = 0;
-            position_cursor();
-        } else {
-            movex(1);
-        }
-    }
-
-    void del() {
-        if (cursor_column == 0) {
-            if (cursor_line > 0) {
-                int line_length = buffer.line_length(cursor_line);
-                buffer.join_with_prev_line(cursor_line);
-                cursor_line -= 1;
-                want_cursor_column = line_length;
-                position_cursor();
-            }
-        } else {
-            buffer.del(cursor_column, cursor_line);
-            movex(-1);
-        }
-    }
-
-    void movehalfpage(int dir) {
-        int amount = dir * rows / 2;
-        scroll_line += amount;
-        movey(amount);
-    }
-
-    const int scrolloff = 2;
-    void scroll() {
-        if (cursor_line - scroll_line > rows - scrolloff) {
-            scroll_line = cursor_line - rows + scrolloff;
-        }
-        if (cursor_line - scroll_line < scrolloff) {
-            scroll_line = cursor_line - scrolloff;
-        }
-        if (scroll_line + rows > buffer.num_lines()) {
-            scroll_line = buffer.num_lines() - rows;
-        }
-        if (scroll_line < 0) {
-            scroll_line = 0;
-        }
-    }
+    /* const int scrolloff = 2; */
+    /* void scroll() { */
+    /*     if (cursor_line - scroll_line > rows - scrolloff) { */
+    /*         scroll_line = cursor_line - rows + scrolloff; */
+    /*     } */
+    /*     if (cursor_line - scroll_line < scrolloff) { */
+    /*         scroll_line = cursor_line - scrolloff; */
+    /*     } */
+    /*     if (scroll_line + rows > buffer.num_lines()) { */
+    /*         scroll_line = buffer.num_lines() - rows; */
+    /*     } */
+    /*     if (scroll_line < 0) { */
+    /*         scroll_line = 0; */
+    /*     } */
+    /* } */
 
     void insert_mode_key(char c) {
         if (c == 'k' && k_will_exit()) {
             mode = EditMode.Normal;
-            del();
+            cursor.del();
         } else {
-            insert(c);
+            cursor.insert(c);
         }
         if (c == 'j') {
             last_key_j = true;
@@ -285,16 +217,16 @@ class BufferView {
     bool onshortcut(SDL_Keysym keysym) {
         switch (keysym.sym) {
         case SDLK_LEFT:
-            movex(-1);
+            cursor.move(Dir.Left);
             break;
         case SDLK_RIGHT:
-            movex(1);
+            cursor.move(Dir.Right);
             break;
         case SDLK_UP:
-            movey(-1);
+            cursor.move(Dir.Up);
             break;
         case SDLK_DOWN:
-            movey(1);
+            cursor.move(Dir.Down);
             break;
         default:
             break;
@@ -304,13 +236,13 @@ class BufferView {
         case EditMode.Insert:
             switch (keysym.sym) {
             case SDLK_BACKSPACE:
-                del();
+                cursor.del();
                 break;
             case SDLK_ESCAPE:
                 mode = EditMode.Normal;
                 break;
             case SDLK_RETURN:
-                insert('\n');
+                cursor.insert('\n');
                 break;
             default:
                 break;
@@ -339,28 +271,28 @@ class BufferView {
                     break;
                 case SDLK_f:
                     if (keysym.mod & KMOD_CTRL) {
-                        movehalfpage(2);
+                        /* movehalfpage(2); */
                     }
                     break;
                 case SDLK_b:
                     if (keysym.mod & KMOD_CTRL) {
-                        movehalfpage(-2);
+                        /* movehalfpage(-2); */
                     } else {
-                        word(-1);
+                        /* word(-1); */
                     }
                     break;
                 case SDLK_d:
                     if (keysym.mod & KMOD_CTRL) {
-                        movehalfpage(1);
+                        /* movehalfpage(1); */
                     }
                     break;
                 case SDLK_u:
                     if (keysym.mod & KMOD_CTRL) {
-                        movehalfpage(-1);
+                        /* movehalfpage(-1); */
                     }
                     break;
                 case SDLK_w:
-                    word(1);
+                    /* word(1); */
                     break;
                 default:
                     break;
@@ -379,16 +311,16 @@ class BufferView {
         case EditMode.Normal:
             switch (c) {
             case 'h':
-                movex(-1);
+                cursor.move(Dir.Left);
                 break;
             case 'j':
-                movey(1);
+                cursor.move(Dir.Down);
                 break;
             case 'k':
-                movey(-1);
+                cursor.move(Dir.Up);
                 break;
             case 'l':
-                movex(1);
+                cursor.move(Dir.Right);
                 break;
             case 'i':
                 mode = EditMode.Insert;
@@ -420,7 +352,7 @@ int main(string[] args) {
 
     init_sdl();
     Window window = new Window();
-    Buffer buffer = new Buffer(args[1]);
+    Buffer buffer = Buffer.of_string(args[1]);
     Font font = new Font(window.renderer, pragmata_pro_regular, 16);
     BufferView buffer_view = new BufferView(buffer, font, window.width, window.height);
 

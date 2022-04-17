@@ -1,3 +1,4 @@
 editor
 .dub/
 scratch/
+editor-test-library

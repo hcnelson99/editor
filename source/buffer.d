@@ -7,7 +7,13 @@ import std.typecons;
 static import std.string;
 static import core.exception;
 
+struct Pos {
+    int row, col;
+}
+
 class Buffer {
+    bool dirty = false;
+
     static Buffer of_file(string filename) {
         Buffer buffer = new Buffer();
         buffer.filename = filename;
@@ -22,42 +28,58 @@ class Buffer {
         return buffer;
     }
 
-    char get(int i) {
+    char get(int i) const {
         return contents[i];
     }
 
     void insert(char c, int i) {
+        dirty = true;
         string s = [c];
         contents = contents[0 .. i] ~ s ~ contents[i .. $];
     }
 
     void del(int i) {
+        dirty = true;
         contents = contents[0 .. i - 1] ~ contents[i .. $];
     }
 
     void save() {
+        dirty = false;
         toFile(contents, filename.get);
     }
 
-    ulong length() {
+    ulong length() const {
         return contents.length;
     }
 
-    int index_of_pos(int row, int col) {
-        int r = 0;
-        int c = 0;
-        for (int i = 0; i < length() && r <= row; i++) {
-            if (row == r && col == c) {
+    int index_of_pos(Pos pos) const {
+        Pos p = Pos(0, 0);
+        for (int i = 0; i < length() && p.row <= pos.row; i++) {
+            if (p == pos) {
                 return i;
             }
             if (get(i) == '\n') {
-                r++;
-                c = 0;
+                p.row++;
+                p.col = 0;
             } else {
-                c++;
+                p.col++;
             }
         }
         return -1;
+    }
+
+    Pos pos_of_index(int target) const {
+        assert(target < length());
+        Pos p = Pos(0, 0);
+        for (int i = 0; i < target; i++) {
+            if (get(i) == '\n') {
+                p.row++;
+                p.col = 0;
+            } else {
+                p.col++;
+            }
+        }
+        return p;
     }
 
     int num_lines() {
@@ -71,7 +93,7 @@ class Buffer {
     }
 
     int line_length(int row) {
-        int start = index_of_pos(row, 0);
+        int start = index_of_pos(Pos(row, 0));
         assert(start != -1);
         for (int i = start; i < length(); i++) {
             if (get(i) == '\n') {
@@ -106,5 +128,7 @@ unittest {
     assertEqual(b.line_length(0), 0);
     assertEqual(b.line_length(1), 3);
     b.insert('a', 0);
-    assertEqual(b.index_of_pos(0, 1), 1);
+    assertEqual(b.index_of_pos(Pos(0, 1)), 1);
+    assertEqual(b.pos_of_index(1), Pos(0, 1));
+    assertEqual(b.pos_of_index(2), Pos(1, 0));
 }
