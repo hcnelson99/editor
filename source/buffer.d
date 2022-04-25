@@ -4,8 +4,7 @@ import std.array;
 import std.exception : enforce;
 import std.file;
 import std.typecons;
-static import std.string;
-static import core.exception;
+import asserts;
 
 struct Pos {
     int row, col;
@@ -33,6 +32,7 @@ class Buffer {
     }
 
     void insert(char c, int i) {
+        assert(0 <= i && i <= length());
         dirty = true;
         string s = [c];
         contents = contents[0 .. i] ~ s ~ contents[i .. $];
@@ -54,22 +54,24 @@ class Buffer {
 
     int index_of_pos(Pos pos) const {
         Pos p = Pos(0, 0);
-        for (int i = 0; i < length() && p.row <= pos.row; i++) {
+        for (int i = 0; i <= length(); i++) {
             if (p == pos) {
                 return i;
             }
-            if (get(i) == '\n') {
-                p.row++;
-                p.col = 0;
-            } else {
-                p.col++;
+            if (i < length()) {
+                if (get(i) == '\n') {
+                    p.row++;
+                    p.col = 0;
+                } else {
+                    p.col++;
+                }
             }
         }
         return -1;
     }
 
     Pos pos_of_index(int target) const {
-        assert(target < length());
+        assert(0 <= target && target <= length());
         Pos p = Pos(0, 0);
         for (int i = 0; i < target; i++) {
             if (get(i) == '\n') {
@@ -109,13 +111,6 @@ private:
     Nullable!string filename;
 }
 
-void assertEqual(T)(T value, T expected) {
-    if (value != expected) {
-        string error = std.string.format("expected %s, got %s", expected, value);
-        throw new core.exception.AssertError(error);
-    }
-}
-
 unittest {
     Buffer b = Buffer.of_string("abc");
     assertEqual(b.get(1), 'b');
@@ -131,4 +126,21 @@ unittest {
     assertEqual(b.index_of_pos(Pos(0, 1)), 1);
     assertEqual(b.pos_of_index(1), Pos(0, 1));
     assertEqual(b.pos_of_index(2), Pos(1, 0));
+}
+
+unittest {
+    Buffer b = Buffer.of_string("abc");
+    b.insert('d', 3);
+    assertEqual(b.get(3), 'd');
+}
+
+unittest {
+    Buffer b = Buffer.of_string("abc");
+    assertEqual(b.pos_of_index(3), Pos(0, 3));
+    assertEqual(b.index_of_pos(Pos(0, 3)), 3);
+
+    b = Buffer.of_string("abc\n123");
+    // actually is this correct?
+    assertEqual(b.pos_of_index(3), Pos(0, 3));
+    assertEqual(b.index_of_pos(Pos(0, 3)), 3);
 }

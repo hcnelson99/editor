@@ -1,4 +1,6 @@
+import std.stdio;
 import buffer;
+import asserts;
 
 enum Dir {
     Left,
@@ -40,8 +42,8 @@ class Cursor {
     }
 
     invariant () {
-        assert(buffer.index_of_pos(pos) == index);
-        assert(0 <= index && index < buffer.length());
+        assertEqual(buffer.index_of_pos(pos), index);
+        assert(0 <= index && index <= buffer.length());
     }
 
 private:
