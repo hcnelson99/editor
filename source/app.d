@@ -167,7 +167,7 @@ class BufferView {
                 int buffer_col = screen_x;
                 int buffer_row = scroll_line + screen_y;
                 int i = buffer.index_of_pos(Pos(buffer_row, buffer_col));
-                char c = i == -1 ? ' ' : buffer.get(i);
+                char c = (i == -1 || i >= buffer.length()) ? ' ' : buffer.get(i);
                 auto text = font.render(c, white, grey);
                 window.blit(text, screen_x * font.width, screen_y * font.height);
             }
