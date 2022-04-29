@@ -17,6 +17,7 @@ class Buffer {
         Buffer buffer = new Buffer();
         buffer.filename = filename;
         buffer.contents = readText(filename);
+        buffer.recompute_newlines();
         return buffer;
     }
 
@@ -24,6 +25,7 @@ class Buffer {
         Buffer buffer = new Buffer();
         buffer.filename = null;
         buffer.contents = contents;
+        buffer.recompute_newlines();
         return buffer;
     }
 
@@ -36,11 +38,13 @@ class Buffer {
         dirty = true;
         string s = [c];
         contents = contents[0 .. i] ~ s ~ contents[i .. $];
+        recompute_newlines();
     }
 
     void del(int i) {
         dirty = true;
         contents = contents[0 .. i - 1] ~ contents[i .. $];
+        recompute_newlines();
     }
 
     void save() {
@@ -53,21 +57,18 @@ class Buffer {
     }
 
     int index_of_pos(Pos pos) const {
-        Pos p = Pos(0, 0);
-        for (int i = 0; i <= length(); i++) {
-            if (p == pos) {
-                return i;
-            }
-            if (i < length()) {
-                if (get(i) == '\n') {
-                    p.row++;
-                    p.col = 0;
-                } else {
-                    p.col++;
-                }
-            }
+        if (pos.row < 0 || pos.row >= num_lines()) {
+            return -1;
         }
-        return -1;
+
+        ulong i = get_beginning_of_line(pos.row);
+        ulong j = get_beginning_of_line(pos.row + 1);
+
+        if (i + pos.col >= j) {
+            return -1;
+        }
+
+        return cast(int)(i + pos.col);
     }
 
     Pos pos_of_index(int target) const {
@@ -84,30 +85,38 @@ class Buffer {
         return p;
     }
 
-    int num_lines() {
-        int lines = 1;
-        for (int i = 0; i < length(); i++) {
-            if (get(i) == '\n') {
-                lines += 1;
-            }
-        }
-        return lines;
+    int num_lines() const {
+        return cast(int)(newlines.length + 1);
     }
 
     int line_length(int row) {
-        int start = index_of_pos(Pos(row, 0));
-        assert(start != -1);
-        for (int i = start; i < length(); i++) {
-            if (get(i) == '\n') {
-                return i - start;
-            }
-        }
-        return cast(int) length() - start;
-
+        return get_beginning_of_line(row + 1) - get_beginning_of_line(row) - 1;
     }
 
 private:
+    int get_beginning_of_line(int row) const {
+        assert(0 <= row && row <= num_lines());
+        if (row == 0) {
+            return 0;
+        }
+        if (row - 1 == newlines.length) {
+            return cast(int)(contents.length) + 1;
+        }
+        return newlines[row - 1] + 1;
+    }
+
     string contents;
+    int[] newlines;
+
+    void recompute_newlines() {
+        newlines = [];
+        foreach (i; 0 .. contents.length) {
+            if (contents[i] == '\n') {
+                newlines ~= cast(int)(i);
+            }
+        }
+    }
+
     Nullable!string filename;
 }
 
