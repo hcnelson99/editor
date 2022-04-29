@@ -183,11 +183,17 @@ class BufferView {
         draw_cursor(window);
     }
 
-    /* void movehalfpage(int dir) { */
-    /*     int amount = dir * rows / 2; */
-    /*     scroll_line += amount; */
-    /*     movey(amount); */
-    /* } */
+    void movehalfpage(Dir dir, int count) {
+        assert(dir == Dir.Down || dir == Dir.Up);
+
+        int halfpage = rows / 2;
+        int amount = halfpage * count;
+
+        int idir = dir == Dir.Down ? 1 : -1;
+        scroll_line += idir * amount;
+
+        move_cursor(dir, amount);
+    }
 
     const int scrolloff = 2;
     void scroll() {
@@ -227,8 +233,8 @@ class BufferView {
 
     }
 
-    void move_cursor(Dir dir, bool allow_movement_to_end_of_line = false) {
-        cursor.move(dir, allow_movement_to_end_of_line);
+    void move_cursor(Dir dir, int count = 1, bool allow_movement_to_end_of_line = false) {
+        cursor.move(dir, count, allow_movement_to_end_of_line);
         scroll();
     }
 
@@ -292,24 +298,24 @@ class BufferView {
                     break;
                 case SDLK_f:
                     if (keysym.mod & KMOD_CTRL) {
-                        /* movehalfpage(2); */
+                        movehalfpage(Dir.Down, 2);
                     }
                     break;
                 case SDLK_b:
                     if (keysym.mod & KMOD_CTRL) {
-                        /* movehalfpage(-2); */
+                        movehalfpage(Dir.Up, 2);
                     } else {
                         /* word(-1); */
                     }
                     break;
                 case SDLK_d:
                     if (keysym.mod & KMOD_CTRL) {
-                        /* movehalfpage(1); */
+                        movehalfpage(Dir.Down, 1);
                     }
                     break;
                 case SDLK_u:
                     if (keysym.mod & KMOD_CTRL) {
-                        /* movehalfpage(-1); */
+                        movehalfpage(Dir.Up, 1);
                     }
                     break;
                 case SDLK_w:
