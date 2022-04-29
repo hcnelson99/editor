@@ -42,6 +42,7 @@ class Buffer {
     }
 
     void del(int i) {
+        assert(0 < i && i <= length());
         dirty = true;
         contents = contents[0 .. i - 1] ~ contents[i .. $];
         recompute_newlines();

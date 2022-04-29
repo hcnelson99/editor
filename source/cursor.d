@@ -23,6 +23,7 @@ class Cursor {
         buffer.insert(c, index);
         index++;
         pos = buffer.pos_of_index(index);
+        want_column = pos.col;
     }
 
     void del() {
@@ -33,13 +34,14 @@ class Cursor {
             index = 0;
         }
         pos = buffer.pos_of_index(index);
+        want_column = pos.col;
     }
 
-    void move(Dir dir) {
+    void move(Dir dir, bool allow_movement_to_end_of_line) {
         final switch (dir) {
         case Dir.Left:
         case Dir.Right:
-            movex(dir);
+            movex(dir, allow_movement_to_end_of_line);
             break;
         case Dir.Up:
         case Dir.Down:
@@ -47,10 +49,18 @@ class Cursor {
         }
     }
 
+    void keep_within_line() {
+        if (pos.col >= buffer.line_length(pos.row)) {
+            pos.col = buffer.line_length(pos.row) - 1;
+            want_column = pos.col;
+        }
+
+    }
+
 private:
     int want_column;
 
-    void movex(Dir dir) {
+    void movex(Dir dir, bool allow_movement_to_end_of_line) {
         bool moved = false;
         switch (dir) {
         case Dir.Left:
@@ -60,7 +70,8 @@ private:
             }
             break;
         case Dir.Right:
-            if (pos.col < buffer.line_length(pos.row) - 1) {
+            int adjust = allow_movement_to_end_of_line ? 0 : 1;
+            if (pos.col < buffer.line_length(pos.row) - adjust) {
                 pos.col++;
                 moved = true;
             }

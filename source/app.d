@@ -136,7 +136,7 @@ class BufferView {
     void resize(int width, int height) {
         rows = height / font.height;
         columns = width / font.width;
-        /* scroll(); */
+        scroll();
     }
 
     char get_char_to_render(Pos pos) {
@@ -189,28 +189,34 @@ class BufferView {
     /*     movey(amount); */
     /* } */
 
-    /* const int scrolloff = 2; */
-    /* void scroll() { */
-    /*     if (cursor_line - scroll_line > rows - scrolloff) { */
-    /*         scroll_line = cursor_line - rows + scrolloff; */
-    /*     } */
-    /*     if (cursor_line - scroll_line < scrolloff) { */
-    /*         scroll_line = cursor_line - scrolloff; */
-    /*     } */
-    /*     if (scroll_line + rows > buffer.num_lines()) { */
-    /*         scroll_line = buffer.num_lines() - rows; */
-    /*     } */
-    /*     if (scroll_line < 0) { */
-    /*         scroll_line = 0; */
-    /*     } */
-    /* } */
+    const int scrolloff = 2;
+    void scroll() {
+        if (cursor.pos.row - scroll_line > rows - scrolloff) {
+            scroll_line = cursor.pos.row - rows + scrolloff;
+        }
+        if (cursor.pos.row - scroll_line < scrolloff) {
+            scroll_line = cursor.pos.row - scrolloff;
+        }
+        if (scroll_line + rows > buffer.num_lines()) {
+            scroll_line = buffer.num_lines() - rows;
+        }
+        if (scroll_line < 0) {
+            scroll_line = 0;
+        }
+    }
+
+    void enter_normal_mode() {
+        mode = EditMode.Normal;
+        cursor.keep_within_line();
+    }
 
     void insert_mode_key(char c) {
         if (c == 'k' && k_will_exit()) {
-            mode = EditMode.Normal;
             cursor.del();
+            enter_normal_mode();
         } else {
             cursor.insert(c);
+            scroll();
         }
         if (c == 'j') {
             last_key_j = true;
@@ -221,19 +227,25 @@ class BufferView {
 
     }
 
+    void move_cursor(Dir dir, bool allow_movement_to_end_of_line = false) {
+        cursor.move(dir, allow_movement_to_end_of_line);
+        scroll();
+    }
+
     bool onshortcut(SDL_Keysym keysym) {
         switch (keysym.sym) {
         case SDLK_LEFT:
-            cursor.move(Dir.Left);
+            move_cursor(Dir.Left);
             break;
         case SDLK_RIGHT:
-            cursor.move(Dir.Right);
+            bool allow_movement_to_end_of_line = mode == EditMode.Insert;
+            move_cursor(Dir.Right, allow_movement_to_end_of_line);
             break;
         case SDLK_UP:
-            cursor.move(Dir.Up);
+            move_cursor(Dir.Up);
             break;
         case SDLK_DOWN:
-            cursor.move(Dir.Down);
+            move_cursor(Dir.Down);
             break;
         default:
             break;
@@ -244,12 +256,14 @@ class BufferView {
             switch (keysym.sym) {
             case SDLK_BACKSPACE:
                 cursor.del();
+                scroll();
                 break;
             case SDLK_ESCAPE:
-                mode = EditMode.Normal;
+                enter_normal_mode();
                 break;
             case SDLK_RETURN:
                 cursor.insert('\n');
+                scroll();
                 break;
             default:
                 break;
@@ -318,16 +332,16 @@ class BufferView {
         case EditMode.Normal:
             switch (c) {
             case 'h':
-                cursor.move(Dir.Left);
+                move_cursor(Dir.Left);
                 break;
             case 'j':
-                cursor.move(Dir.Down);
+                move_cursor(Dir.Down);
                 break;
             case 'k':
-                cursor.move(Dir.Up);
+                move_cursor(Dir.Up);
                 break;
             case 'l':
-                cursor.move(Dir.Right);
+                move_cursor(Dir.Right);
                 break;
             case 'i':
                 mode = EditMode.Insert;
