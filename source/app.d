@@ -32,7 +32,6 @@ class Window {
 
     void set_color(SDL_Color color) {
         SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
-
     }
 
     void clear(SDL_Color color) {

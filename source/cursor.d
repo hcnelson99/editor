@@ -28,7 +28,11 @@ class Cursor {
     void del() {
         int index = buffer.index_of_pos(pos);
         buffer.del(index);
-        move(Dir.Left);
+        index -= 1;
+        if (index < 0) {
+            index = 0;
+        }
+        pos = buffer.pos_of_index(index);
     }
 
     void move(Dir dir) {
@@ -47,21 +51,26 @@ private:
     int want_column;
 
     void movex(Dir dir) {
+        bool moved = false;
         switch (dir) {
         case Dir.Left:
             if (pos.col > 0) {
                 pos.col--;
+                moved = true;
             }
             break;
         case Dir.Right:
             if (pos.col < buffer.line_length(pos.row) - 1) {
                 pos.col++;
+                moved = true;
             }
             break;
         default:
             assert(false);
         }
-        want_column = pos.col;
+        if (moved) {
+            want_column = pos.col;
+        }
     }
 
     void movey(Dir dir) {
@@ -81,11 +90,11 @@ private:
         }
 
         pos.col = want_column;
-        if (pos.col <= 0) {
-            pos.col = 0;
-        }
         if (pos.col > buffer.line_length(pos.row) - 1) {
             pos.col = buffer.line_length(pos.row) - 1;
+        }
+        if (pos.col <= 0) {
+            pos.col = 0;
         }
     }
 
