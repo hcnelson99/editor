@@ -140,6 +140,15 @@ class BufferView {
         /* scroll(); */
     }
 
+    char get_char_to_render(Pos pos) {
+        int i = buffer.index_of_pos(pos);
+        char c = (i == -1 || i >= buffer.length()) ? ' ' : buffer.get(i);
+        if (c == '\n') {
+            c = ' ';
+        }
+        return c;
+    }
+
     void draw_cursor(Window window) {
         int screen_x = cursor.pos.col;
         if (mode == EditMode.Insert && k_will_exit) {
@@ -150,7 +159,7 @@ class BufferView {
         int pixel_y = screen_y * font.height;
         final switch (mode) {
         case EditMode.Normal:
-            char c = cursor.index == -1 ? ' ' : buffer.get(cursor.index);
+            char c = get_char_to_render(cursor.pos);
             auto text = font.render(c, grey, white);
             window.blit(text, pixel_x, pixel_y);
             break;
@@ -166,8 +175,7 @@ class BufferView {
             foreach (screen_x; 0 .. columns) {
                 int buffer_col = screen_x;
                 int buffer_row = scroll_line + screen_y;
-                int i = buffer.index_of_pos(Pos(buffer_row, buffer_col));
-                char c = (i == -1 || i >= buffer.length()) ? ' ' : buffer.get(i);
+                char c = get_char_to_render(Pos(buffer_row, buffer_col));
                 auto text = font.render(c, white, grey);
                 window.blit(text, screen_x * font.width, screen_y * font.height);
             }

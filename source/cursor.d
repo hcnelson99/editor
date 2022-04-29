@@ -13,19 +13,20 @@ class Cursor {
     Buffer buffer;
 
     Pos pos;
-    int index;
 
     this(Buffer buffer) {
         this.buffer = buffer;
     }
 
     void insert(char c) {
+        int index = buffer.index_of_pos(pos);
         buffer.insert(c, index);
-        index += 1;
+        index++;
         pos = buffer.pos_of_index(index);
     }
 
     void del() {
+        int index = buffer.index_of_pos(pos);
         buffer.del(index);
         move(Dir.Left);
     }
@@ -41,11 +42,6 @@ class Cursor {
         }
     }
 
-    invariant () {
-        assertEqual(buffer.index_of_pos(pos), index);
-        assert(0 <= index && index <= buffer.length());
-    }
-
 private:
     int want_column;
 
@@ -54,13 +50,11 @@ private:
         case Dir.Left:
             if (pos.col > 0) {
                 pos.col--;
-                index--;
             }
             break;
         case Dir.Right:
             if (pos.col < buffer.line_length(pos.row) - 1) {
                 pos.col++;
-                index++;
             }
             break;
         default:
