@@ -32,13 +32,14 @@ class Cursor {
     }
 
     void move(Dir dir) {
-        switch (dir) {
+        final switch (dir) {
         case Dir.Left:
         case Dir.Right:
             movex(dir);
             break;
-        default:
-            assert(false);
+        case Dir.Up:
+        case Dir.Down:
+            movey(dir);
         }
     }
 
@@ -61,6 +62,31 @@ private:
             assert(false);
         }
         want_column = pos.col;
+    }
+
+    void movey(Dir dir) {
+        switch (dir) {
+        case Dir.Up:
+            if (pos.row > 0) {
+                pos.row--;
+            }
+            break;
+        case Dir.Down:
+            if (pos.row < buffer.num_lines() - 1) {
+                pos.row++;
+            }
+            break;
+        default:
+            assert(false);
+        }
+
+        pos.col = want_column;
+        if (pos.col <= 0) {
+            pos.col = 0;
+        }
+        if (pos.col > buffer.line_length(pos.row) - 1) {
+            pos.col = buffer.line_length(pos.row) - 1;
+        }
     }
 
 }

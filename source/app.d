@@ -360,7 +360,7 @@ int main(string[] args) {
 
     init_sdl();
     Window window = new Window();
-    Buffer buffer = Buffer.of_string(args[1]);
+    Buffer buffer = Buffer.of_file(args[1]);
     Font font = new Font(window.renderer, pragmata_pro_regular, 16);
     BufferView buffer_view = new BufferView(buffer, font, window.width, window.height);
 
