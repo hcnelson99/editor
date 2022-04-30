@@ -37,6 +37,64 @@ class Cursor {
         want_column = pos.col;
     }
 
+    bool move_char(Dir dir) {
+        assert(dir == Dir.Left || dir == Dir.Right);
+        int i = buffer.index_of_pos(pos);
+        if (dir == Dir.Left) {
+            i -= 1;
+        } else {
+            i += 1;
+        }
+        if (i < 0 || i >= buffer.length()) {
+            return true;
+        }
+        pos = buffer.pos_of_index(i);
+        return false;
+    }
+
+    enum Classification {
+        Whitespace,
+        Word,
+        Symbol
+    }
+
+    Classification classify_letter(char c) {
+        import std.ascii;
+
+        if (isAlphaNum(c) || c == '_') {
+            return Classification.Word;
+        } else if (isWhite(c)) {
+            return Classification.Whitespace;
+        } else {
+            return Classification.Symbol;
+        }
+    }
+
+    bool is_word_beginning() {
+        int i = buffer.index_of_pos(pos);
+        int prev = i - 1;
+
+        if (prev < 0) {
+            return false;
+        }
+        char ci = buffer.get(i);
+        char cprev = buffer.get(prev);
+        Classification ti = classify_letter(ci);
+        Classification tprev = classify_letter(cprev);
+        return ti != Classification.Whitespace && ti != tprev;
+    }
+
+    void word(Dir dir) {
+        assert(dir == Dir.Left || dir == Dir.Right);
+
+        bool at_edge = move_char(dir);
+        while (!at_edge && !is_word_beginning()) {
+            at_edge = move_char(dir);
+        }
+
+        want_column = pos.col;
+    }
+
     void move(Dir dir, int count, bool allow_movement_to_end_of_line) {
         assert(count >= 1);
         final switch (dir) {

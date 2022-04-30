@@ -238,6 +238,11 @@ class BufferView {
         scroll();
     }
 
+    void word(Dir dir) {
+        cursor.word(dir);
+        scroll();
+    }
+
     bool onshortcut(SDL_Keysym keysym) {
         switch (keysym.sym) {
         case SDLK_LEFT:
@@ -305,7 +310,7 @@ class BufferView {
                     if (keysym.mod & KMOD_CTRL) {
                         movehalfpage(Dir.Up, 2);
                     } else {
-                        /* word(-1); */
+                        word(Dir.Left);
                     }
                     break;
                 case SDLK_d:
@@ -319,7 +324,7 @@ class BufferView {
                     }
                     break;
                 case SDLK_w:
-                    /* word(1); */
+                    word(Dir.Right);
                     break;
                 default:
                     break;
