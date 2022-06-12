@@ -100,6 +100,26 @@ class Font {
     }
 }
 
+struct Key {
+    enum Type {
+        Char
+    };
+
+    Type type;
+    bool ctrl = false;
+
+    union {
+        char ch;
+    }
+
+    Key of_char(char c) {
+        Key key;
+        key.type = Type.Char;
+        ch = c;
+        return key;
+    }
+};
+
 enum EditMode {
     Insert,
     Normal
@@ -243,8 +263,8 @@ class BufferView {
         scroll();
     }
 
-    bool onshortcut(SDL_Keysym keysym) {
-        switch (keysym.sym) {
+    bool on_keydown(SDL_Keycode sym) {
+        switch (sym) {
         case SDLK_LEFT:
             move_cursor(Dir.Left);
             break;
@@ -264,7 +284,7 @@ class BufferView {
 
         final switch (mode) {
         case EditMode.Insert:
-            switch (keysym.sym) {
+            switch (sym) {
             case SDLK_BACKSPACE:
                 cursor.del();
                 scroll();
@@ -283,7 +303,7 @@ class BufferView {
         case EditMode.Normal:
             if (last_key_space) {
                 last_key_space = false;
-                switch (keysym.sym) {
+                switch (sym) {
                 case SDLK_q:
                     if (!buffer.dirty) {
                         return true;
@@ -297,34 +317,9 @@ class BufferView {
                 }
             } else {
                 last_key_space = false;
-                switch (keysym.sym) {
+                switch (sym) {
                 case SDLK_SPACE:
                     last_key_space = true;
-                    break;
-                case SDLK_f:
-                    if (keysym.mod & KMOD_CTRL) {
-                        movehalfpage(Dir.Down, 2);
-                    }
-                    break;
-                case SDLK_b:
-                    if (keysym.mod & KMOD_CTRL) {
-                        movehalfpage(Dir.Up, 2);
-                    } else {
-                        word(Dir.Left);
-                    }
-                    break;
-                case SDLK_d:
-                    if (keysym.mod & KMOD_CTRL) {
-                        movehalfpage(Dir.Down, 1);
-                    }
-                    break;
-                case SDLK_u:
-                    if (keysym.mod & KMOD_CTRL) {
-                        movehalfpage(Dir.Up, 1);
-                    }
-                    break;
-                case SDLK_w:
-                    word(Dir.Right);
                     break;
                 default:
                     break;
@@ -335,30 +330,57 @@ class BufferView {
         return false;
     }
 
-    void onkey(char c) {
+    void on_input(char c, bool ctrl) {
         final switch (mode) {
         case EditMode.Insert:
             insert_mode_key(c);
             break;
         case EditMode.Normal:
-            switch (c) {
-            case 'h':
-                move_cursor(Dir.Left);
-                break;
-            case 'j':
-                move_cursor(Dir.Down);
-                break;
-            case 'k':
-                move_cursor(Dir.Up);
-                break;
-            case 'l':
-                move_cursor(Dir.Right);
-                break;
-            case 'i':
-                mode = EditMode.Insert;
-                break;
-            default:
-                break;
+            if (!last_key_space) {
+                switch (c) {
+                case 'h':
+                    move_cursor(Dir.Left);
+                    break;
+                case 'j':
+                    move_cursor(Dir.Down);
+                    break;
+                case 'k':
+                    move_cursor(Dir.Up);
+                    break;
+                case 'l':
+                    move_cursor(Dir.Right);
+                    break;
+                case 'i':
+                    mode = EditMode.Insert;
+                    break;
+                case 'f':
+                    if (ctrl) {
+                        movehalfpage(Dir.Down, 2);
+                    }
+                    break;
+                case 'b':
+                    if (ctrl) {
+                        movehalfpage(Dir.Up, 2);
+                    } else {
+                        word(Dir.Left);
+                    }
+                    break;
+                case 'd':
+                    if (ctrl) {
+                        movehalfpage(Dir.Down, 1);
+                    }
+                    break;
+                case 'u':
+                    if (ctrl) {
+                        movehalfpage(Dir.Up, 1);
+                    }
+                    break;
+                case 'w':
+                    word(Dir.Right);
+                    break;
+                default:
+                    break;
+                }
             }
         }
 
@@ -388,6 +410,9 @@ int main(string[] args) {
     Font font = new Font(window.renderer, pragmata_pro_regular, 16);
     BufferView buffer_view = new BufferView(buffer, font, window.width, window.height);
 
+    bool lctrl = false;
+    bool rctrl = false;
+
     SDL_StartTextInput();
     bool running = true;
     while (running) {
@@ -410,15 +435,37 @@ int main(string[] args) {
                 }
                 break;
             case SDL_KEYDOWN:
-                bool exit = buffer_view.onshortcut(event.key.keysym);
-                if (exit) {
-                    running = false;
+                switch (event.key.keysym.sym) {
+                case SDLK_LCTRL:
+                    lctrl = true;
+                    break;
+                case SDLK_RCTRL:
+                    rctrl = true;
+                    break;
+                default:
+                    bool exit = buffer_view.on_keydown(event.key.keysym.sym);
+                    if (exit) {
+                        running = false;
+                    }
+                    break;
+                }
+                break;
+            case SDL_KEYUP:
+                switch (event.key.keysym.sym) {
+                case SDLK_LCTRL:
+                    lctrl = false;
+                    break;
+                case SDLK_RCTRL:
+                    rctrl = false;
+                    break;
+                default:
+                    break;
                 }
                 break;
 
             case SDL_TEXTINPUT:
                 foreach (char c; fromStringz(event.text.text.ptr)) {
-                    buffer_view.onkey(c);
+                    buffer_view.on_input(c, lctrl || rctrl);
                 }
                 break;
             default:
